@@ -55,10 +55,12 @@ for line in f :
             count_bug = count_bug + 1
             bug_inputs.append(str1)
             arr = chang_array(line)
+            arr = arr[0:len(arr) - 1] #这是为了将每一行数组中的lable去掉
             bug_inputs_vector.append(arr)
         else:
             all_inputs.append(line)
             arr = chang_array(line)
+            arr = arr[0:len(arr) - 1] #这是为了将每一行数组中的lable去掉
             all_inputs_vector.append(arr)
 
 
@@ -96,7 +98,7 @@ def get_deances(inputs1,inputs2):
     arr_difference = arr_difference.sum()
     arr_difference = arr_difference ** 0.5
     return arr_difference
-    def made_bug(bug_inputs_vector,all_inputs_vector):
+def made_bug(bug_inputs_vector,all_inputs_vector):
      str_list = []
      bug_vector = bug_inputs_vector[random.randrange(0,len(bug_inputs_vector))]
    #  bug_vector = bug_inputs_vector[2]
@@ -140,21 +142,20 @@ def get_deances(inputs1,inputs2):
      new_str = str(str_list)
  #    new_str = ','.join(str(i) for i in b)
      print type(new_str)
+     new_str = new_str[1:len(new_str)-1] #数组转换为字符的时候有中括号，要去掉
+     f = open("C:/Users/Chris/Desktop/1.lang2.2_all.csv", 'a') #写入的是没有文件名的新bug信息
+     f.write(new_str)
+     f.close()
      return new_str
 '''
-f = open("C:/Users/Chris/Desktop/1.lang2.2_all.csv", 'a')
-f.write(new_str)
-f.close()
+
 '''
 
-out_bug_list = []
-print new_str[len(new_str)-1]
-out_bug_str = new_str[1:len(new_str)-1]
-'''现在通过一系列的转换终于可以将一些奇怪的符号去掉了，最后使用的就是out_bug_str'''
-print out_bug_str
-bug_name_str = "lang\WordUtils.java\org.apache.commons.lang.WordUtils"
+bug_name_str = "lang\WordUtils.java\org.apache.commons.lang.WordUtils，"
 new_bug = bug_name_str+out_bug_str;
 print new_bug
+
+
 '''
 for i in range(0,6):
     print new_str[i]
