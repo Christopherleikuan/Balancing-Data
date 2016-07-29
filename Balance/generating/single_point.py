@@ -28,4 +28,4 @@ def single_point(vector1,vector2):
     new_bug = judge_lable(vector1,vector2,new_bug)
 
 
-    return new_bug_point
+    return new_bug
