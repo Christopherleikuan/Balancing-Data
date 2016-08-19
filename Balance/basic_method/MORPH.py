@@ -4,8 +4,8 @@ import random
 import operator
 import string
 bug_rate = 0.20
-read_file = "C:/Users/Chris/Desktop/1.lang2.2_all.csv"
-save_file = "C:/Users/Chris/Desktop/1.lang2.2_all.csv"
+read_file = "C:/Users/Chris/Desktop/7.lang3.0.1_all.csv"
+save_file = "C:/Users/Chris/Desktop/7.lang3.0.1_all.csv"
 def chang_array(inputs):
    # print "str:",inputs
 
@@ -96,15 +96,15 @@ def MORPH_function(bug_rate,read_file,save_file):
                 arr = chang_array(line)
                 all_inputs_vector.append(arr)
     new_bug_list = []
-    print float(len(bug_inputs_vector)) / len(all_inputs_vector)
-    while float(len(bug_inputs_vector)) / len(all_inputs_vector) != bug_rate:
-        new_bug = made_bug(bug_inputs_vector,all_inputs_vector)
+  #  print round(float(len(bug_inputs_vector)) / len(all_inputs_vector), 2)
+    while round(float(len(bug_inputs_vector)) / len(all_inputs_vector), 2) != bug_rate:
+        new_bug = made_bug(bug_inputs_vector, all_inputs_vector)
 
         bug_inputs_vector.append(new_bug)
         new_bug_list.append(new_bug)
-        print len(bug_inputs_vector)
-        print len(all_inputs_vector)
-        print len(bug_inputs_vector) / len(all_inputs_vector)
+     #   print len(bug_inputs_vector)
+     #   print len(all_inputs_vector)
+      #  print round(float(len(bug_inputs_vector)) / len(all_inputs_vector), 2)
 
     for i in range(len(new_bug_list)):
         str_list = []
@@ -113,7 +113,7 @@ def MORPH_function(bug_rate,read_file,save_file):
         for k in range(0, len(str_list)):
             str_list[k] = round(str_list[k], 2)
         new_str = str(str_list)
-        print type(new_str)
+     #   print type(new_str)
         out_bug_str = new_str[1:len(new_str) - 1]
         bug_name_str = "lang\WordUtils.java\org.apache.commons.lang.WordUtils,"
         new_bug_1 = bug_name_str + out_bug_str + '\n'
