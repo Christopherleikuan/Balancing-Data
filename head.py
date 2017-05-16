@@ -19,16 +19,19 @@ import csv
 _metaclass_ = type  #
 
 
-class resampling():
+class resampling:
     """
 
     """
 
     def __init__(self, rate):
+        self.new_list_SMOTE = []
         self.rate = rate
         self.new_bug_list_morph = []
         self.new_bug_list_add = []
         self.new_bug_list_del = []
+        self.new_MORPH_list = []
+
         return
 
     def get_deances(self, inputs1, inputs2):
@@ -80,24 +83,38 @@ class resampling():
         print"should make bug number is :", self.make_bug_num
         count = 1
         new_bug_list = []
-        while count <= self.make_bug_num:
-            new_bug = self.made_bug(bug_list, all_list)
+        # print "1111", self.make_bug_num
+        if self.make_bug_num >= 1:
+            while count <= self.make_bug_num:
+                new_bug = self.made_bug(bug_list, all_list)
 
-            # bug_list.append(new_bug)
-            new_bug_list.append(new_bug)
-            count += 1
-        self.new_bug_list_morph = new_bug_list
+                # bug_list.append(new_bug)
+                new_bug_list.append(new_bug)
+                count += 1
+            self.new_bug_list_morph = new_bug_list
+            import numpy as np
+            # print "2222"
+            nx = np.row_stack((self.new_bug_list_morph, all_list))
+            self.new_MORPH_list = nx
+        else:
+            self.new_MORPH_list = all_list
 
     def ADD(self, bug_rate, all_list, bug_list):
         self.make_bug_rate_number(all_list, bug_list, bug_rate)
         count = 1
         new_bug_list = []
-        while count <= self.make_bug_num:
-            bug_random_num = random.randint(0, len(bug_list) - 1)
-            new_bug = bug_list[bug_random_num]
-            new_bug_list.append(new_bug)
-            count += 1
-        self.new_bug_list_add = new_bug_list
+        if self.make_bug_num >= 1:
+            while count <= self.make_bug_num:
+                bug_random_num = random.randint(0, len(bug_list) - 1)
+                new_bug = bug_list[bug_random_num]
+                new_bug_list.append(new_bug)
+                count += 1
+            self.new_bug_list_add = new_bug_list
+            import numpy as np
+            nx = np.row_stack((self.new_bug_list_add, all_list))
+            self.new_ADD_list = nx
+        else:
+            self.new_ADD_list = all_list
 
     def DEL(self, bug_rate, unbug_list, bug_list):
         """
@@ -120,8 +137,82 @@ class resampling():
             new_unbug_list.append(new_unbug)
             count += 1
         self.new_bug_list_del = new_unbug_list
+        import numpy as np
+        nx = np.row_stack((self.new_bug_list_del, bug_list))
+        self.new_DEL_list = nx
 
-class supervised():
+    def SMOTE(self, bug_rate, X, Y):
+        """
+        Combine over- and under-sampling using SMOTE and
+         Edited Nearest Neighbours.
+         通过改进的SMOTE来对原来的数据集做处理
+        :param bug_rate:
+        :param X:数据集除了lable以外的部分
+        :param Y:lable信息
+        :return:处理过的X，Y。
+        """
+        # print "smote", X, Y
+        bug_num = 0
+        unbug_num = 0
+        all_num = 0
+        for i in Y:
+            if i == 0:
+                unbug_num += 1
+
+            else:
+                bug_num += 1
+        all_num = unbug_num + bug_num
+        if bug_num <= 6:
+            repeat_bug_copunt = 6 / bug_num
+            bug_repat_list_y = Y.tolist()
+            bug_repat_list_x = X.tolist()
+
+            for j in range(repeat_bug_copunt):
+                for i in range(len(Y)):
+                    if Y[i] == 1:
+                        bug_repat_list_x.append(X[i])
+                        bug_repat_list_y.append(Y[i])
+
+
+            bug_num = bug_num * (repeat_bug_copunt + 1)
+            if float(bug_num) / float(all_num) <= (bug_rate - 0.05):
+                from collections import Counter
+                from imblearn.combine import SMOTEENN
+                from imblearn.over_sampling import SMOTE
+                # sme = SMOTE(kind='regular')
+                sme = SMOTEENN(ratio=bug_rate)
+                x_res, y_res = sme.fit_sample(bug_repat_list_x, bug_repat_list_y)
+                import numpy as np
+                nx = np.column_stack((x_res, y_res))
+                self.new_list_SMOTE = nx
+            else:
+                import numpy as np
+                nx = np.column_stack((X, Y))
+                self.new_list_SMOTE = nx
+        else:
+            if float(bug_num) / float(all_num) <= (bug_rate - 0.05):
+                from collections import Counter
+                from imblearn.combine import SMOTEENN
+                from imblearn.over_sampling import SMOTE
+                # sme = SMOTE(kind='regular')
+                sme = SMOTEENN(ratio=bug_rate)
+                x_res, y_res = sme.fit_sample(X, Y)
+                import numpy as np
+                nx = np.column_stack((x_res, y_res))
+                self.new_list_SMOTE = nx
+            else:
+                import numpy as np
+                nx = np.column_stack((X, Y))
+                self.new_list_SMOTE = nx
+
+
+
+
+
+        # print nx
+
+
+class supervised:
     """supervised learning:
         此类是为了给模块提供一个可以调用学习器功能的一个类，每一个对象并不是
         特殊对应着文件，而是给数据使用的。
@@ -151,9 +242,10 @@ class supervised():
         expected = Y_test
         prediceted = modle.predict(X_test)
         ftp, tpr, thres = metrics.roc_curve(expected, prediceted)
-        print metrics.classification_report(expected, prediceted)
+        # print metrics.classification_report(expected, prediceted)
         # print metrics.confusion_matrix(expected, prediceted)
-        print metrics.auc(ftp, tpr)
+        # print metrics.auc(ftp, tpr)
+        return metrics.classification_report(expected, prediceted), metrics.auc(ftp, tpr)
         '''有下面的代码就是自动交换测试集和训练集做测试'''
         """
         modle.fit(X_test, Y_test)
@@ -165,8 +257,6 @@ class supervised():
         print metrics.auc(ftp, tpr)
         """
 
-
-
     def Naive_Bayes(self, X_train, Y_train, X_test, Y_test):
         from sklearn import metrics
         from sklearn.naive_bayes import GaussianNB
@@ -175,9 +265,10 @@ class supervised():
         expected = Y_test
         prediceted = modle.predict(X_test)
         ftp, tpr, thres = metrics.roc_curve(expected, prediceted)
-        print metrics.classification_report(expected, prediceted)
+        # print metrics.classification_report(expected, prediceted)
         # print metrics.confusion_matrix(expected, prediceted)
-        print metrics.auc(ftp, tpr)
+        # print metrics.auc(ftp, tpr)
+        return metrics.classification_report(expected, prediceted), metrics.auc(ftp, tpr)
 
     def Neural_network(self, X_train, Y_train, X_test, Y_test):
         from sklearn import metrics
@@ -187,9 +278,10 @@ class supervised():
         expected = Y_test
         prediceted = modle.predict(X_test)
         ftp, tpr, thres = metrics.roc_curve(expected, prediceted)
-        print metrics.classification_report(expected, prediceted)
+        # print metrics.classification_report(expected, prediceted)
         # print metrics.confusion_matrix(expected, prediceted)
-        print metrics.auc(ftp, tpr)
+        # print metrics.auc(ftp, tpr)
+        return metrics.classification_report(expected, prediceted), metrics.auc(ftp, tpr)
 
     def Random_Forest(self, X_train, Y_train, X_test, Y_test):
         from sklearn import metrics
@@ -199,9 +291,10 @@ class supervised():
         expected = Y_test
         prediceted = modle.predict(X_test)
         ftp, tpr, thres = metrics.roc_curve(expected, prediceted)
-        print metrics.classification_report(expected, prediceted)
+        # print metrics.classification_report(expected, prediceted)
         # print metrics.confusion_matrix(expected, prediceted)
-        print metrics.auc(ftp, tpr)
+        # print metrics.auc(ftp, tpr)
+        return metrics.classification_report(expected, prediceted), metrics.auc(ftp, tpr)
 
 
 class File(resampling):
@@ -210,6 +303,8 @@ class File(resampling):
         self.test_list = []
         self.train_bug_list = []
         self.train_unbug_list = []
+        self.test_bug_list = []
+        self.test_unbug_list = []
         self.name = name
         self.read_file_address = read_file_address
         return
@@ -298,16 +393,16 @@ class File(resampling):
     def read_csv_2(self):
         import numpy as np
         import csv
-        dataset = np.loadtxt(self.read_file_address, delimiter=',', skiprows=0)
-        X = dataset[:, 0:17]
-        Y = dataset[:, 17]
+        dataset = np.loadtxt(self.read_file_address, delimiter=',', skiprows=1)
+        X = dataset[:, 0:len(dataset[0]) - 1]
+        Y = dataset[:, len(dataset[0]) - 1]
         self.X = X
         self.Y = Y
         self.arr_list = dataset
         bug = []
         unbug = []
         for ver in dataset:
-            if ver[17] == 1.0:
+            if ver[len(ver) - 1] == 1:
 
                 bug.append(ver)
             else:
@@ -317,6 +412,7 @@ class File(resampling):
         self.unbug_list = unbug
         self.bug_list = bug
         self.list = unbug + bug
+
         return
 
     def csv_cv(self, cv_rate):  # 将文件进行cv划分
@@ -342,7 +438,7 @@ class File(resampling):
     def stratified_k_fold(self, list):
         from sklearn.model_selection import StratifiedKFold
         skf = StratifiedKFold(n_splits=2)
-        for train, test in skf.split(list, list[:, 17]):
+        for train, test in skf.split(list, list[:, len(list[0]) - 1]):
             # print 'skf train:', "%s" % train, "skf test:", "%s" % test
             X_train, X_test = list[train], list[test]
         # print len(X_train), len(X_test)
@@ -356,6 +452,36 @@ class File(resampling):
                 self.train_bug_list.append(j)
             else:
                 self.train_unbug_list.append(j)
+        for i in self.X_test:
+            if i[len(i) - 1] != 0:
+                self.test_bug_list.append(i)
+            else:
+                self.test_unbug_list.append(i)
+
+        return
+    def ShuffleSplit_k_fold(self, list):
+        from sklearn.model_selection import ShuffleSplit
+        skf = ShuffleSplit(n_splits=2,test_size=0.5,train_size=0.5)
+        for train, test in skf.split(list, list[:, len(list[0]) - 1]):
+            # print 'skf train:', "%s" % train, "skf test:", "%s" % test
+            X_train, X_test = list[train], list[test]
+        # print len(X_train), len(X_test)
+        self.X_train = X_train
+        self.X_test = X_test
+        self.train_list = X_train
+        self.test_list = X_test
+        '''由于resampling需要将bug部分分离出来，故在此操作'''
+        for j in self.X_train:
+            if j[len(j) - 1] != 0:
+                self.train_bug_list.append(j)
+            else:
+                self.train_unbug_list.append(j)
+        for i in self.X_test:
+            if i[len(i) - 1] != 0:
+                self.test_bug_list.append(i)
+            else:
+                self.test_unbug_list.append(i)
+
         return
 
     def check_file_bug_num(self, file_list):
@@ -363,7 +489,7 @@ class File(resampling):
         for j in file_list:
             if j[len(j) - 1] != 0:
                 count_bug += 1
-        print count_bug
+        # print count_bug
 
     def csv_cross_version(self):  # 对文件做跨版本处理
         return
@@ -372,21 +498,28 @@ class File(resampling):
 
         return
 
-    def csv_resampling_MORPH(self, bug_rate, cv_or_cross):
+    def csv_resampling_MORPH(self, bug_rate, cv_or_cross, train_or_test):
         """
         通过输入bug的比例数来生成行的bug数
         :param bug_rate: bug比例数
         :cv_or_cross: 输入cv就是做cv的，输出cross就是做跨版本的，用的list不同
+        :train_or_test: 输入test就是对test做resampling
         :return: 在resampling类中引用了函数self.MORPH函数中定义了一个
         self.new_bug_list_morph对象数据来装载生成的新的bug。
         所以最后的输出是self.new_bug_list_morph + self.list
         """
-        if cv_or_cross == 'cv':
-            self.MORPH(bug_rate, self.train_list, self.train_bug_list)
+        if train_or_test == 'train':
+            if cv_or_cross == 'cv':
+                self.MORPH(bug_rate, self.train_list, self.train_bug_list)
+            else:
+                self.MORPH(bug_rate, self.list, self.bug_list)
         else:
-            self.MORPH(bug_rate, self.list, self.bug_list)
+            if cv_or_cross == 'cv':
+                self.MORPH(bug_rate, self.test_list, self.test_bug_list)
+            else:
+                self.MORPH(bug_rate, self.list, self.bug_list)
 
-    def csv_resampling_add(self, bug_rate, cv_or_cross):
+    def csv_resampling_add(self, bug_rate, cv_or_cross, train_or_test):
         """
         输入bug比例数和控制选项来生成相对应的bug
         :param bug_rate: bug比例数
@@ -395,16 +528,42 @@ class File(resampling):
         self.new_bug_list_add对象数据来装载生成的新的bug。
         所以最后的输出是self.new_bug_list_add + self.list
         """
-        if cv_or_cross == 'cv':
-            self.ADD(bug_rate, self.train_list, self.train_bug_list)
+        if train_or_test == 'train':
+            if cv_or_cross == 'cv':
+                self.ADD(bug_rate, self.train_list, self.train_bug_list)
+            else:
+                self.ADD(bug_rate, self.list, self.bug_list)
         else:
-            self.ADD(bug_rate, self.list, self.bug_list)
+            if cv_or_cross == 'cv':
+                self.ADD(bug_rate, self.test_list, self.test_bug_list)
+            else:
+                self.ADD(bug_rate, self.list, self.bug_list)
 
-    def csv_resampling_del(self, bug_rate, cv_or_cross):
-        if cv_or_cross == 'cv':
-            self.DEL(bug_rate, self.train_unbug_list, self.train_bug_list)
+    def csv_resampling_del(self, bug_rate, cv_or_cross, train_or_test):
+        if train_or_test == 'train':
+
+            if cv_or_cross == 'cv':
+                self.DEL(bug_rate, self.train_unbug_list, self.train_bug_list)
+            else:
+                self.DEL(bug_rate, self.unbug_list, self.bug_list)
         else:
-            self.DEL(bug_rate, self.unbug_list, self.bug_list)
+
+            if cv_or_cross == 'cv':
+                self.DEL(bug_rate, self.test_unbug_list, self.test_bug_list)
+            else:
+                self.DEL(bug_rate, self.unbug_list, self.bug_list)
+
+    def csv_resampling_SMOTE(self,bug_rate, cv_or_cross, train_or_test):
+        if train_or_test == 'train':
+            if cv_or_cross == 'cv':
+                self.SMOTE(bug_rate, self.train_list[:, 0:(len(self.train_list[0]) - 1)], self.train_list[:, (len(self.train_list[0]) - 1)])
+            else:
+                self.SMOTE(bug_rate, self.arr_list[:, 0:(len(self.train_list[0]) - 1)],self.arr_list[:, (len(self.arr_list[0]) - 1)])
+        else:
+            if cv_or_cross == 'cv':
+                self.SMOTE(bug_rate, self.test_list[:, 0:(len(self.train_list[0]) - 1)], self.test_list[:, (len(self.test_list[0]) - 1)])
+            else:
+                self.SMOTE(bug_rate, self.arr_list[:, 0:(len(self.train_list[0]) - 1)], self.arr_list[:, (len(self.arr_list[0]) - 1)])
 
     def csv_out_file(self, file_name, out_list):
         """
@@ -448,6 +607,546 @@ class File(resampling):
         print "new_bug_list_del :", len(self.new_bug_list_del)
         print "write_list :", len(self.new_bug_list_del) + len(self.bug_list)
         print "bug make num :", self.make_bug_num
+
+
+class Control:
+    """
+    主要功能是控制代码自动生成文件夹，然后自动化的生成文件
+    需要储存的中间结果就是不同的训练结果的文件。
+
+    """
+    def __init__(self):
+        self.file_name_list = []  # 存放文件名的list，例如jdt
+        self.file_address_list = []  # 存放文件地址的list，例如C:/Users/Chris/Desktop/aeeem\JDT.csv
+        self.file_org_list = []  # 存放文件地址但是除去原有的后缀.csv的list
+        return
+
+    def file_analysis(self, Multilayer_folder, Multilayer_folder_adder,
+                      folder_name):
+
+        if Multilayer_folder == False:
+            file_add = 'C:/Users/Chris/Desktop/' + folder_name + "/*.csv"
+            import glob
+            for filename in glob.glob(r"%s" % file_add):
+                self.file_address_list.append(filename)
+                file_add_org = filename[0:len(filename) - 4]
+                self.file_org_list.append(file_add_org)
+                for j in range(len(file_add_org)):
+                    if file_add_org[j] == '\\':
+                        file_name = file_add_org[j + 1:]
+                        self.file_name_list.append(file_name)
+        else:
+            file_add = Multilayer_folder_adder + '/' + folder_name + "/*.csv"
+            import glob
+            for filename in glob.glob(r"%s" % file_add):
+                self.file_address_list.append(filename)
+                file_add_org = filename[0:len(filename) - 4]
+                self.file_org_list.append(file_add_org)
+                for j in range(len(file_add_org)):
+                    if file_add_org[j] == '\\':
+                        file_name = file_add_org[j + 1:]
+                        self.file_name_list.append(file_name)
+
+    def make_folder(self):
+        """
+        通过self.file_org_list中的元素生成相应的文件夹，比如train，test等
+        :return:
+        """
+        import os
+        ''' 生成训练集文件夹'''
+        for vec in self.file_org_list:
+            file_add_train = vec + '_' + 'train'
+            os.mkdir(r'%s' % file_add_train)  # 生成训练集文件夹
+
+            file_add_train_org = file_add_train + '/' + 'org'
+            os.mkdir(r'%s' % file_add_train_org)  # 生成训练集原始文件夹
+
+            file_add_train_add = file_add_train + '/' + 'add'
+            os.mkdir(r'%s' % file_add_train_add)  # 生成训练集add文件夹
+
+            file_add_train_del = file_add_train + '/' + 'del'
+            os.mkdir(r'%s' % file_add_train_del)  # 生成训练集del文件夹
+
+            file_add_train_morph = file_add_train + '/' + 'morph'
+            os.mkdir(r'%s' % file_add_train_morph)  # 生成训练集morph文件夹
+
+            file_add_train_smote = file_add_train + '/' + 'smote'
+            os.mkdir(r'%s' % file_add_train_smote)  # 生成训练集原始文件夹
+
+        ''' 生成测试集文件夹'''
+        import os
+        for vec in self.file_org_list:
+            file_add_test = vec + '_' + 'test'
+            os.mkdir(r'%s' % file_add_test)
+            file_add_train_org = file_add_test + '/' + 'org'
+            os.mkdir(r'%s' % file_add_train_org)  # 生成训练集原始文件夹
+
+            file_add_train_add = file_add_test + '/' + 'add'
+            os.mkdir(r'%s' % file_add_train_add)  # 生成训练集add文件夹
+
+            file_add_train_del = file_add_test + '/' + 'del'
+            os.mkdir(r'%s' % file_add_train_del)  # 生成训练集del文件夹
+
+            file_add_train_morph = file_add_test + '/' + 'morph'
+            os.mkdir(r'%s' % file_add_train_morph)  # 生成训练集morph文件夹
+
+            file_add_train_smote = file_add_test + '/' + 'smote'
+            os.mkdir(r'%s' % file_add_train_smote)  # 生成训练集原始文件夹
+
+    def cv_and_learn_control(self, cv_count, bug_rate):
+        self.all_result = []
+        for file_count in range(len(self.file_address_list)):
+            current_result = []
+            filename = self.file_address_list[file_count]
+            file_add_org = self.file_org_list[file_count]
+            file_name = self.file_name_list[file_count]
+            '''生成存放训练集合路径'''
+            import os
+            file_add_train = file_add_org + '_' + 'train'
+            os.mkdir(r'%s' % file_add_train)  # 生成训练集文件夹
+
+            file_add_train_org = file_add_train + '/' + 'org'
+            os.mkdir(r'%s' % file_add_train_org)  # 生成训练集原始文件夹
+
+            file_add_train_add = file_add_train + '/' + 'add'
+            os.mkdir(r'%s' % file_add_train_add)  # 生成训练集add文件夹
+
+            file_add_train_del = file_add_train + '/' + 'del'
+            os.mkdir(r'%s' % file_add_train_del)  # 生成训练集del文件夹
+
+            file_add_train_morph = file_add_train + '/' + 'morph'
+            os.mkdir(r'%s' % file_add_train_morph)  # 生成训练集morph文件夹
+
+            file_add_train_smote = file_add_train + '/' + 'smote'
+            os.mkdir(r'%s' % file_add_train_smote)  # 生成训练集原始文件夹
+            '''生成测试集路径'''
+            import os
+            file_add_test = file_add_org + '_' + 'test'
+            os.mkdir(r'%s' % file_add_test)
+
+            file_add_test_org = file_add_test + '/' + 'org'
+            os.mkdir(r'%s' % file_add_test_org)  # 生成训练集原始文件夹
+
+            file_add_test_add = file_add_test + '/' + 'add'
+            os.mkdir(r'%s' % file_add_test_add)  # 生成训练集add文件夹
+
+            file_add_test_del = file_add_test + '/' + 'del'
+            os.mkdir(r'%s' % file_add_test_del)  # 生成训练集del文件夹
+
+            file_add_test_morph = file_add_test + '/' + 'morph'
+            os.mkdir(r'%s' % file_add_test_morph)  # 生成训练集morph文件夹
+
+            file_add_test_smote = file_add_test + '/' + 'smote'
+            os.mkdir(r'%s' % file_add_test_smote)  # 生成训练集原始文件夹
+
+            '''开始批量生成csv文件'''
+            for i in range(1, cv_count + 1):
+                print file_name, i
+                f = File('this', filename)
+                f.read_csv_2()
+                f.ShuffleSplit_k_fold(f.arr_list)
+                ML = supervised()
+                """morph方法"""
+                '''train'''
+                f.csv_resampling_MORPH(bug_rate, 'cv', 'train')
+                file_train_name_morph = file_name + '_1.0_20_train_morph_' + "%d" % i + ".csv"
+                file_train_name_morph_adder = file_add_train_morph + '/' + file_train_name_morph
+                # print file_train_name_morph_adder
+                f.csv_out_file(file_train_name_morph_adder, f.new_MORPH_list)
+
+                '''做测试'''
+
+                a, b = ML.Logistics_Regression(f.new_MORPH_list[:, 0:(len(f.new_MORPH_list[0]) - 1)],
+                                               f.new_MORPH_list[:, (len(f.new_MORPH_list[0]) - 1)],
+                                               f.test_list[:, 0:(len(f.new_MORPH_list[0]) - 1)],
+                                               f.test_list[:, (len(f.new_MORPH_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'LR', 'MORPH', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+                a, b = ML.Random_Forest(f.new_MORPH_list[:, 0:(len(f.new_MORPH_list[0]) - 1)],
+                                        f.new_MORPH_list[:, (len(f.new_MORPH_list[0]) - 1)],
+                                        f.test_list[:, 0:(len(f.new_MORPH_list[0]) - 1)],
+                                        f.test_list[:, (len(f.new_MORPH_list[0]) - 1)])
+                a = a.split()
+
+                current_result = [file_name, 'RF', 'MORPH', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+                a, b = ML.Naive_Bayes(f.new_MORPH_list[:, 0:(len(f.new_MORPH_list[0]) - 1)],
+                                      f.new_MORPH_list[:, (len(f.new_MORPH_list[0]) - 1)],
+                                      f.test_list[:, 0:(len(f.new_MORPH_list[0]) - 1)],
+                                      f.test_list[:, (len(f.new_MORPH_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'NB', 'MORPH', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+                a, b = ML.Neural_network(f.new_MORPH_list[:, 0:(len(f.new_MORPH_list[0]) - 1)],
+                                         f.new_MORPH_list[:, (len(f.new_MORPH_list[0]) - 1)],
+                                         f.test_list[:, 0:(len(f.new_MORPH_list[0]) - 1)],
+                                         f.test_list[:, (len(f.new_MORPH_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'NN', 'MORPH', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+
+                '''test'''
+                f.csv_resampling_MORPH(bug_rate, 'cv', 'test')
+                file_test_name_morph = file_name + '_1.0_20_test_morph_' + "%d" % i + ".csv"
+                file_test_name_morph_adder = file_add_test_morph + '/' + file_test_name_morph
+                f.csv_out_file(file_test_name_morph_adder, f.new_MORPH_list)
+
+                '''做测试'''
+
+                a, b = ML.Logistics_Regression(f.new_MORPH_list[:, 0:(len(f.new_MORPH_list[0]) - 1)],
+                                               f.new_MORPH_list[:, (len(f.new_MORPH_list[0]) - 1)],
+                                               f.train_list[:, 0:(len(f.new_MORPH_list[0]) - 1)],
+                                               f.train_list[:, (len(f.new_MORPH_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'LR', 'MORPH', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+                a, b = ML.Random_Forest(f.new_MORPH_list[:, 0:(len(f.new_MORPH_list[0]) - 1)],
+                                        f.new_MORPH_list[:, (len(f.new_MORPH_list[0]) - 1)],
+                                        f.train_list[:, 0:(len(f.new_MORPH_list[0]) - 1)],
+                                        f.train_list[:, (len(f.new_MORPH_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'RF', 'MORPH', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+                a, b = ML.Naive_Bayes(f.new_MORPH_list[:, 0:(len(f.new_MORPH_list[0]) - 1)],
+                                      f.new_MORPH_list[:, (len(f.new_MORPH_list[0]) - 1)],
+                                      f.train_list[:, 0:(len(f.new_MORPH_list[0]) - 1)],
+                                      f.train_list[:, (len(f.new_MORPH_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'NB', 'MORPH', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+                a, b = ML.Neural_network(f.new_MORPH_list[:, 0:(len(f.new_MORPH_list[0]) - 1)],
+                                         f.new_MORPH_list[:, (len(f.new_MORPH_list[0]) - 1)],
+                                         f.train_list[:, 0:(len(f.new_MORPH_list[0]) - 1)],
+                                         f.train_list[:, (len(f.new_MORPH_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'NN', 'MORPH', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+
+
+                """add方法"""
+                '''train'''
+                f.csv_resampling_add(bug_rate, 'cv', 'train')
+                file_train_name_add = file_name + '_1.0_20_train_add_' + "%d" % i + ".csv"
+                file_train_name_add_adder = file_add_train_add + '/' + file_train_name_add
+                f.csv_out_file(file_train_name_add_adder, f.new_ADD_list)
+                '''做测试'''
+
+                a, b = ML.Logistics_Regression(f.new_ADD_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                        f.new_ADD_list[:, (len(f.new_ADD_list[0]) - 1)],
+                                        f.test_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                        f.test_list[:, (len(f.new_ADD_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'LR', 'ADD', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+                a, b = ML.Random_Forest(f.new_ADD_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                        f.new_ADD_list[:, (len(f.new_ADD_list[0]) - 1)],
+                                        f.test_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                        f.test_list[:, (len(f.new_ADD_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'RF', 'ADD', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+                a, b = ML.Naive_Bayes(f.new_ADD_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                        f.new_ADD_list[:, (len(f.new_ADD_list[0]) - 1)],
+                                        f.test_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                        f.test_list[:, (len(f.new_ADD_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'NB', 'ADD', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+                a, b = ML.Neural_network(f.new_ADD_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                        f.new_ADD_list[:, (len(f.new_ADD_list[0]) - 1)],
+                                        f.test_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                        f.test_list[:, (len(f.new_ADD_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'NN', 'ADD', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+
+
+                '''test'''
+                f.csv_resampling_add(bug_rate, 'cv', 'test')
+                file_test_name_add = file_name + '_1.0_20_test_add_' + "%d" % i + ".csv"
+                file_test_name_add_adder = file_add_test_add + '/' + file_test_name_add
+                f.csv_out_file(file_test_name_add_adder, f.new_ADD_list)
+                '''做测试'''
+                a, b = ML.Logistics_Regression(f.new_ADD_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                        f.new_ADD_list[:, (len(f.new_ADD_list[0]) - 1)],
+                                        f.train_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                        f.train_list[:, (len(f.new_ADD_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'LR', 'ADD', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+                a, b = ML.Random_Forest(f.new_ADD_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                        f.new_ADD_list[:, (len(f.new_ADD_list[0]) - 1)],
+                                        f.train_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                        f.train_list[:, (len(f.new_ADD_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'RF', 'ADD', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+                a, b = ML.Naive_Bayes(f.new_ADD_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                        f.new_ADD_list[:, (len(f.new_ADD_list[0]) - 1)],
+                                        f.train_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                        f.train_list[:, (len(f.new_ADD_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'NB', 'ADD', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+                a, b = ML.Neural_network(f.new_ADD_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                        f.new_ADD_list[:, (len(f.new_ADD_list[0]) - 1)],
+                                        f.train_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                        f.train_list[:, (len(f.new_ADD_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'NN', 'ADD', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+
+                """del方法"""
+                '''train'''
+                f.csv_resampling_del(bug_rate, 'cv', 'train')
+                file_train_name_del = file_name + '_1.0_20_train_del_' + "%d" % i + ".csv"
+                file_train_name_del_adder = file_add_train_del + '/' + file_train_name_del
+                f.csv_out_file(file_train_name_del_adder, f.new_DEL_list)
+                '''做测试'''
+
+                a, b = ML.Logistics_Regression(f.new_DEL_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                               f.new_DEL_list[:, (len(f.new_ADD_list[0]) - 1)],
+                                               f.test_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                               f.test_list[:, (len(f.new_ADD_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'LR', 'DEl', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+                a, b = ML.Random_Forest(f.new_DEL_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                        f.new_DEL_list[:, (len(f.new_ADD_list[0]) - 1)],
+                                        f.test_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                        f.test_list[:, (len(f.new_ADD_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'RF', 'DEl', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+                a, b = ML.Naive_Bayes(f.new_DEL_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                      f.new_DEL_list[:, (len(f.new_ADD_list[0]) - 1)],
+                                      f.test_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                      f.test_list[:, (len(f.new_ADD_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'NB', 'DEl', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+                a, b = ML.Neural_network(f.new_DEL_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                         f.new_DEL_list[:, (len(f.new_ADD_list[0]) - 1)],
+                                         f.test_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                         f.test_list[:, (len(f.new_ADD_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'NN', 'DEl', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+
+                '''test'''
+                f.csv_resampling_del(bug_rate, 'cv', 'test')
+                file_test_name_del = file_name + '_1.0_20_test_del_' + "%d" % i + ".csv"
+                file_test_name_del_adder = file_add_test_del + '/' + file_test_name_del
+                f.csv_out_file(file_test_name_del_adder, f.new_DEL_list)
+                '''做测试'''
+
+                a, b = ML.Logistics_Regression(f.new_DEL_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                               f.new_DEL_list[:, (len(f.new_ADD_list[0]) - 1)],
+                                               f.train_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                               f.train_list[:, (len(f.new_ADD_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'LR', 'DEl', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+                a, b = ML.Random_Forest(f.new_DEL_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                        f.new_DEL_list[:, (len(f.new_ADD_list[0]) - 1)],
+                                        f.train_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                        f.train_list[:, (len(f.new_ADD_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'RF', 'DEl', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+                a, b = ML.Naive_Bayes(f.new_DEL_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                      f.new_DEL_list[:, (len(f.new_ADD_list[0]) - 1)],
+                                      f.train_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                      f.train_list[:, (len(f.new_ADD_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'NB', 'DEl', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+                a, b = ML.Neural_network(f.new_DEL_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                         f.new_DEL_list[:, (len(f.new_ADD_list[0]) - 1)],
+                                         f.train_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                         f.train_list[:, (len(f.new_ADD_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'NN', 'DEl', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+
+
+                """SMOTE方法"""
+                '''train'''
+                f.csv_resampling_SMOTE(bug_rate, 'cv', 'train')
+                file_train_name_smote = file_name + '_1.0_20_train_smote_' + "%d" % i + ".csv"
+                file_train_name_smote_adder = file_add_train_smote + '/' + file_train_name_smote
+                f.csv_out_file(file_train_name_smote_adder, f.new_list_SMOTE)
+
+                '''做测试'''
+
+                a, b = ML.Logistics_Regression(f.new_list_SMOTE[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                               f.new_list_SMOTE[:, (len(f.new_ADD_list[0]) - 1)],
+                                               f.test_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                               f.test_list[:, (len(f.new_ADD_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'LR', 'SMOTE', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+                a, b = ML.Random_Forest(f.new_list_SMOTE[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                        f.new_list_SMOTE[:, (len(f.new_ADD_list[0]) - 1)],
+                                        f.test_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                        f.test_list[:, (len(f.new_ADD_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'RF', 'SMOTE', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+                a, b = ML.Naive_Bayes(f.new_list_SMOTE[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                      f.new_list_SMOTE[:, (len(f.new_ADD_list[0]) - 1)],
+                                      f.test_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                      f.test_list[:, (len(f.new_ADD_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'NB', 'SMOTE', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+                a, b = ML.Neural_network(f.new_list_SMOTE[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                         f.new_list_SMOTE[:, (len(f.new_ADD_list[0]) - 1)],
+                                         f.test_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                         f.test_list[:, (len(f.new_ADD_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'NN', 'SMOTE', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+
+                '''test'''
+                f.csv_resampling_SMOTE(bug_rate, 'cv', 'test')
+                file_test_name_smote = file_name + '_1.0_20_test_smote_' + "%d" % i + ".csv"
+                file_test_name_smote_adder = file_add_test_smote + '/' + file_test_name_smote
+                f.csv_out_file(file_test_name_smote_adder, f.new_list_SMOTE)
+
+                '''做测试'''
+
+                a, b = ML.Logistics_Regression(f.new_list_SMOTE[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                               f.new_list_SMOTE[:, (len(f.new_ADD_list[0]) - 1)],
+                                               f.train_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                               f.train_list[:, (len(f.new_ADD_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'LR', 'SMOTE', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+                a, b = ML.Random_Forest(f.new_list_SMOTE[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                        f.new_list_SMOTE[:, (len(f.new_ADD_list[0]) - 1)],
+                                        f.train_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                        f.train_list[:, (len(f.new_ADD_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'RF', 'SMOTE', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+                a, b = ML.Naive_Bayes(f.new_list_SMOTE[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                      f.new_list_SMOTE[:, (len(f.new_ADD_list[0]) - 1)],
+                                      f.train_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                      f.train_list[:, (len(f.new_ADD_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'NB', 'SMOTE', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+                a, b = ML.Neural_network(f.new_list_SMOTE[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                         f.new_list_SMOTE[:, (len(f.new_ADD_list[0]) - 1)],
+                                         f.train_list[:, 0:(len(f.new_ADD_list[0]) - 1)],
+                                         f.train_list[:, (len(f.new_ADD_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'NN', 'SMOTE', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+
+
+                '''org写入'''
+                file_train_name_org = file_name + '_1.0_20_train_org_' + "%d" % i + ".csv"
+                file_train_name_org_adder = file_add_train_org + '/' + file_train_name_org
+                f.csv_out_file(file_train_name_org_adder, f.train_list)
+
+                '''test写入'''
+                file_test_name_org = file_name + '_1.0_20_test_org_' + "%d" % i + ".csv"
+                file_test_name_org_adder = file_add_test_org + '/' + file_test_name_org
+                f.csv_out_file(file_test_name_org_adder, f.test_list)
+
+    def cv_ang_learn_oog_data_control(self,cv_count, bug_rate):
+
+        for file_count in range(len(self.file_address_list)):
+            current_result = []
+            filename = self.file_address_list[file_count]
+            file_add_org = self.file_org_list[file_count]
+            file_name = self.file_name_list[file_count]
+
+            for i in range(1, cv_count + 1):
+                print file_name, i
+                f = File('this', filename)
+                f.read_csv_2()
+                f.ShuffleSplit_k_fold(f.arr_list)
+                ML = supervised()
+                a, b = ML.Logistics_Regression(f.train_list[:, 0:(len(f.train_list[0]) - 1)],
+                                               f.train_list[:, (len(f.train_list[0]) - 1)],
+                                               f.test_list[:, 0:(len(f.train_list[0]) - 1)],
+                                               f.test_list[:, (len(f.train_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'LR', 'org', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+                a, b = ML.Random_Forest(f.train_list[:, 0:(len(f.train_list[0]) - 1)],
+                                               f.train_list[:, (len(f.train_list[0]) - 1)],
+                                               f.test_list[:, 0:(len(f.train_list[0]) - 1)],
+                                               f.test_list[:, (len(f.train_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'RF', 'org', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+                a, b = ML.Naive_Bayes(f.train_list[:, 0:(len(f.train_list[0]) - 1)],
+                                        f.train_list[:, (len(f.train_list[0]) - 1)],
+                                        f.test_list[:, 0:(len(f.train_list[0]) - 1)],
+                                        f.test_list[:, (len(f.train_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'NB', 'org', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+                a, b = ML.Neural_network(f.train_list[:, 0:(len(f.train_list[0]) - 1)],
+                                        f.train_list[:, (len(f.train_list[0]) - 1)],
+                                        f.test_list[:, 0:(len(f.train_list[0]) - 1)],
+                                        f.test_list[:, (len(f.train_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'NN', 'org', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+
+                '''train与test交换'''
+
+                a, b = ML.Logistics_Regression(f.test_list[:, 0:(len(f.train_list[0]) - 1)],
+                                               f.test_list[:, (len(f.train_list[0]) - 1)],
+                                               f.train_list[:, 0:(len(f.train_list[0]) - 1)],
+                                               f.train_list[:, (len(f.train_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'LR', 'org', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+                a, b = ML.Random_Forest(f.test_list[:, 0:(len(f.train_list[0]) - 1)],
+                                               f.test_list[:, (len(f.train_list[0]) - 1)],
+                                               f.train_list[:, 0:(len(f.train_list[0]) - 1)],
+                                               f.train_list[:, (len(f.train_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'RF', 'org', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+                a, b = ML.Naive_Bayes(f.test_list[:, 0:(len(f.train_list[0]) - 1)],
+                                               f.test_list[:, (len(f.train_list[0]) - 1)],
+                                               f.train_list[:, 0:(len(f.train_list[0]) - 1)],
+                                               f.train_list[:, (len(f.train_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'NB', 'org', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+                a, b = ML.Neural_network(f.test_list[:, 0:(len(f.train_list[0]) - 1)],
+                                               f.test_list[:, (len(f.train_list[0]) - 1)],
+                                               f.train_list[:, 0:(len(f.train_list[0]) - 1)],
+                                               f.train_list[:, (len(f.train_list[0]) - 1)])
+                a = a.split()
+                current_result = [file_name, 'NN', 'org', a[17], a[18], a[19], b]
+                self.all_result.append(current_result)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
